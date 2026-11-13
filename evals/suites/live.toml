@@ -3,7 +3,7 @@
 # so the model cannot edit the tests it is graded on.
 #
 #   CASTORCODER_EVAL_LIVE=1 CASTORCODER_API_KEY=... \
-#   CASTORCODER_BASE_URL=https://api.llm.ustc.edu.cn CASTORCODER_MODEL=deepseek-flash \
+#   CASTORCODER_BASE_URL=https://your-gateway.example.com/v1 CASTORCODER_MODEL=deepseek-flash \
 #   python -m castorcoder.evals --suite evals/suites/live.toml --live --repeats 3
 
 [suite]

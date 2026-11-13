@@ -5,7 +5,7 @@
 #
 #   export CASTORCODER_EVAL_LIVE=1
 #   export CASTORCODER_API_KEY=...
-#   export CASTORCODER_BASE_URL=https://api.llm.ustc.edu.cn
+#   export CASTORCODER_BASE_URL=https://your-gateway.example.com/v1
 #   export CASTORCODER_MODEL=deepseek-flash
 #   python -m castorcoder.evals --suite evals/suites/mbpp.toml --live --jobs 4
 
