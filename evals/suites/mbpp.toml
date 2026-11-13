@@ -1,0 +1,25 @@
+# MBPP sanitized: 427 short, execution-graded Python programming problems.
+#
+# The agent receives the problem description and the expected signature in
+# `solution.py`; the sanitized assertions are hidden until it stops.
+#
+#   export CASTORCODER_EVAL_LIVE=1
+#   export CASTORCODER_API_KEY=...
+#   export CASTORCODER_BASE_URL=https://api.llm.ustc.edu.cn
+#   export CASTORCODER_MODEL=deepseek-flash
+#   python -m castorcoder.evals --suite evals/suites/mbpp.toml --live --jobs 4
+
+[suite]
+name = "mbpp"
+fixture_root = "."
+verifier_root = "evals/verifiers"
+
+[[tasks]]
+id = "mbpp"
+kind = "generation"
+dataset = "mbpp"
+dataset_path = "../datasets/sanitized-mbpp.json"
+max_rounds = 8
+repeats = 1
+min_pass = 0.0
+tags = ["benchmark", "mbpp", "generation"]

@@ -1,0 +1,37 @@
+# Retrieval depth: the same 35 labeled queries swept over k = 1, 3, 5, 10, 20.
+#
+# This suite does not replace `retrieval_repo.toml`; it adds a k-sweep so the
+# report shows both early-rank precision (Recall@1) and long-list coverage.
+#
+#   python -m castorcoder.evals --suite evals/suites/retrieval_repo_depth.toml --verbose
+
+[suite]
+name = "retrieval-repo-depth"
+fixture_root = "."
+verifier_root = "evals/verifiers"
+
+[[tasks]]
+id = "repo-retrieval-file-k-sweep"
+kind = "retrieval"
+fixture = "."
+queries_file = "queries_repo.toml"
+gold_level = "file"
+k = 5
+ks = [1, 3, 5, 10, 20]
+modes = ["hybrid", "bm25", "vector"]
+exclude = ["evals/", "docs/", "article/"]
+min_recall = 0.70
+tags = ["retrieval", "ablation", "file-level", "k-sweep"]
+
+[[tasks]]
+id = "repo-retrieval-symbol-k-sweep"
+kind = "retrieval"
+fixture = "."
+queries_file = "queries_repo.toml"
+gold_level = "symbol"
+k = 5
+ks = [1, 3, 5, 10, 20]
+modes = ["hybrid", "bm25", "vector"]
+exclude = ["evals/", "docs/", "article/"]
+min_recall = 0.40
+tags = ["retrieval", "ablation", "symbol-level", "k-sweep"]

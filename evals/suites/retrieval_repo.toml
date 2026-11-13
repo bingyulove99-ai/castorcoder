@@ -1,0 +1,36 @@
+# Retrieval benchmark over CastorCoder's own repository (35 labeled queries).
+#
+# Excludes the benchmark's own suite/result artifacts so query text cannot
+# retrieve itself. Reports the same index in hybrid, BM25-only and vector-only
+# mode, at both file level and symbol level.
+#
+#   python -m castorcoder.evals --suite evals/suites/retrieval_repo.toml --verbose
+
+[suite]
+name = "retrieval-repo"
+fixture_root = "."
+verifier_root = "evals/verifiers"
+
+[[tasks]]
+id = "repo-retrieval-file"
+kind = "retrieval"
+fixture = "."
+queries_file = "queries_repo.toml"
+gold_level = "file"
+k = 5
+modes = ["hybrid", "bm25", "vector"]
+exclude = ["evals/suites/", "evals/results/", "evals/verifiers/"]
+min_recall = 0.70
+tags = ["retrieval", "ablation", "file-level"]
+
+[[tasks]]
+id = "repo-retrieval-symbol"
+kind = "retrieval"
+fixture = "."
+queries_file = "queries_repo.toml"
+gold_level = "symbol"
+k = 5
+modes = ["hybrid", "bm25", "vector"]
+exclude = ["evals/suites/", "evals/results/", "evals/verifiers/"]
+min_recall = 0.40
+tags = ["retrieval", "ablation", "symbol-level"]

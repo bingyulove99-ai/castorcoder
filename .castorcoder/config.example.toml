@@ -1,0 +1,29 @@
+[castorcoder]
+model = "gpt-4o"
+provider = "openai"
+permission_mode = "workspace"
+max_tokens = 4096
+temperature = 0.0
+max_context_tokens = 128000
+max_rounds = 200
+max_tool_output = 15000
+max_parallel_tools = 8
+trace = true
+allow_outside_workspace = false
+
+# Set this to false in ~/.castorcoder/config.toml to ignore per-project
+# configs and use one global configuration everywhere.
+use_project_config = true
+
+# Local code index and long-term memory
+index = true
+auto_index = true
+embedding_model = "hash"
+memory = true
+auto_remember = true
+
+# Optional MCP servers (start with --mcp)
+# [mcp.servers.filesystem]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "."]
+# risk = "read"

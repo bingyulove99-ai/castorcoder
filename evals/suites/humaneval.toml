@@ -1,0 +1,26 @@
+# OpenAI HumanEval: 164 execution-graded function-synthesis problems.
+#
+# The agent receives the signature and docstring in `solution.py`; the official
+# tests are copied in only after it stops. No tests are visible during the run,
+# matching the canonical zero-shot HumanEval setting.
+#
+#   export CASTORCODER_EVAL_LIVE=1
+#   export CASTORCODER_API_KEY=...
+#   export CASTORCODER_BASE_URL=https://api.llm.ustc.edu.cn
+#   export CASTORCODER_MODEL=deepseek-flash
+#   python -m castorcoder.evals --suite evals/suites/humaneval.toml --live --jobs 4
+
+[suite]
+name = "humaneval"
+fixture_root = "."
+verifier_root = "evals/verifiers"
+
+[[tasks]]
+id = "humaneval"
+kind = "generation"
+dataset = "humaneval"
+dataset_path = "../datasets/HumanEval.jsonl.gz"
+max_rounds = 8
+repeats = 1
+min_pass = 0.0
+tags = ["benchmark", "humaneval", "generation"]

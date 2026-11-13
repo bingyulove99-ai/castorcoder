@@ -1,0 +1,142 @@
+# Shared query labels for the CastorCoder repository retrieval benchmark.
+# Gold format: path#symbol (symbol-level) or path (file-level).
+
+[[queries]]
+query = "schedule independent read-only tool calls concurrently"
+gold = ["castorcoder/executor.py#ToolExecutor.execute_many"]
+
+[[queries]]
+query = "block mutating tools before their python code runs in plan mode"
+gold = ["castorcoder/executor.py#PermissionPolicy"]
+
+[[queries]]
+query = "detect the agent repeating the same tool call"
+gold = ["castorcoder/agent.py#Agent.run"]
+
+[[queries]]
+query = "compress the conversation when it grows past the token budget"
+gold = ["castorcoder/context.py#ContextManager.maybe_compress"]
+
+[[queries]]
+query = "estimate token usage for a list of chat messages"
+gold = ["castorcoder/context.py#estimate_tokens"]
+
+[[queries]]
+query = "redact api keys and secrets from tool output"
+gold = ["castorcoder/executor.py#redact_secrets"]
+
+[[queries]]
+query = "reject absolute paths and symlink escapes outside the workspace root"
+gold = ["castorcoder/workspace.py#Workspace"]
+
+[[queries]]
+query = "atomic file write using a temporary file then os.replace"
+gold = ["castorcoder/fsutil.py#atomic_write_text"]
+
+[[queries]]
+query = "restore files modified during this session"
+gold = ["castorcoder/tools/edit.py#ChangeTracker"]
+
+[[queries]]
+query = "render a unified diff for an edit"
+gold = ["castorcoder/tools/edit.py#_unified_diff"]
+
+[[queries]]
+query = "reciprocal rank fusion of two ranked result lists"
+gold = ["castorcoder/ranking.py#rrf_fuse"]
+
+[[queries]]
+query = "split python source into function and class chunks with the ast module"
+gold = ["castorcoder/index/chunker.py#_chunk_python"]
+
+[[queries]]
+query = "split a large class into separate method chunks"
+gold = ["castorcoder/index/chunker.py#_split_class"]
+
+[[queries]]
+query = "sqlite fts5 full text search ordered by bm25"
+gold = ["castorcoder/index/store.py#CodeStore.search_lexical"]
+
+[[queries]]
+query = "incremental code indexing that skips unchanged files by content hash"
+gold = ["castorcoder/index/indexer.py#CodeIndex"]
+
+[[queries]]
+query = "offline feature hashing embedder without an external model"
+gold = ["castorcoder/index/embedder.py#HashingEmbedder"]
+
+[[queries]]
+query = "fuse lexical and vector search results into cited hits"
+gold = ["castorcoder/index/retriever.py#hybrid_search"]
+
+[[queries]]
+query = "deduplicate long term memories by content hash"
+gold = ["castorcoder/memory/store.py#MemoryStore.add"]
+
+[[queries]]
+query = "distill episodes and decisions from a finished agent run"
+gold = ["castorcoder/memory/writer.py#MemoryWriter.distill"]
+
+[[queries]]
+query = "inject recalled memories into the system prompt as untrusted data"
+gold = ["castorcoder/memory/injector.py#build_context"]
+
+[[queries]]
+query = "mcp stdio client initialize handshake and json rpc framing"
+gold = ["castorcoder/mcp/client.py#MCPClient.start"]
+
+[[queries]]
+query = "adapt external mcp server tools to the local tool interface"
+gold = ["castorcoder/mcp/tool.py#MCPTool"]
+
+[[queries]]
+query = "task board with todo in progress and done states"
+gold = ["castorcoder/planning.py#TaskBoard"]
+
+[[queries]]
+query = "progressive disclosure of skill markdown content on demand"
+gold = ["castorcoder/skills.py#SkillCatalog"]
+
+[[queries]]
+query = "save the chat session atomically to disk"
+gold = ["castorcoder/session.py#save_session"]
+
+[[queries]]
+query = "jsonl trace recorder for agent lifecycle events"
+gold = ["castorcoder/events.py#JsonlTrace"]
+
+[[queries]]
+query = "retry rate limit errors with exponential backoff"
+gold = ["castorcoder/llm.py#LLM._call_with_retry"]
+
+[[queries]]
+query = "accumulate streaming tool call argument deltas"
+gold = ["castorcoder/llm.py#LLM.chat"]
+
+[[queries]]
+query = "configuration precedence between defaults toml environment and cli flags"
+gold = ["castorcoder/config.py#Config.from_env"]
+
+[[queries]]
+query = "deterministic scripted model for reproducible agent tests"
+gold = ["castorcoder/evals/runner.py#ScriptedLLM"]
+
+[[queries]]
+query = "recall at k, mean reciprocal rank and ndcg calculation"
+gold = ["castorcoder/evals/metrics.py#evaluate_ranking"]
+
+[[queries]]
+query = "reject fork bombs and destructive shell commands"
+gold = ["castorcoder/tools/bash.py#_check_dangerous"]
+
+[[queries]]
+query = "base class for tools that resolve paths inside the workspace"
+gold = ["castorcoder/tools/base.py#WorkspaceTool"]
+
+[[queries]]
+query = "permission modes table for plan workspace and full access"
+gold = ["README.md#Permission model"]
+
+[[queries]]
+query = "architecture invariants for the evaluation harness"
+gold = ["docs/ARCHITECTURE.md#Evaluation harness"]
