@@ -276,3 +276,57 @@ def test_subagent_runs_with_isolated_context(tmp_path):
     assert "Sub-agent completed: reviewer/research" in output
     assert "research result" in output
     assert parent.messages == []
+
+
+class EmptyReplyLLM:
+    """Model double that can return empty/truncated completions on demand."""
+
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.calls: list[int | None] = []
+        self.model = "empty-test"
+        self.total_prompt_tokens = 0
+        self.total_completion_tokens = 0
+        self.max_output_tokens = 4_096
+
+    @property
+    def estimated_cost(self):
+        return None
+
+    def chat(self, messages, tools=None, on_token=None, max_tokens=None):
+        self.calls.append(max_tokens)
+        return self.replies.pop(0)
+
+
+def test_empty_truncated_reply_is_retried_with_larger_budget(tmp_path):
+    llm = EmptyReplyLLM([
+        LLMResponse(content="", finish_reason="length", completion_tokens=4_096),
+        LLMResponse(content="recovered", finish_reason="stop", completion_tokens=12),
+    ])
+    agent = Agent(llm, workspace=tmp_path)
+    result = agent.run("write it")
+
+    assert result.output == "recovered"
+    assert result.stats.stop_reason == "completed"
+    # The retry doubles the configured cap; the empty reply is not kept in
+    # history, and the harness nudge explains what went wrong.
+    assert llm.calls == [None, 8_192]
+    assert not any(
+        message.get("role") == "assistant" and message.get("content") is None
+        for message in agent.messages
+    )
+    assert any(
+        "cut off by the output token limit" in str(message.get("content", ""))
+        for message in agent.messages
+    )
+
+
+def test_empty_reply_stops_with_visible_explanation(tmp_path):
+    llm = EmptyReplyLLM([LLMResponse(content=None, finish_reason="stop") for _ in range(3)])
+    agent = Agent(llm, workspace=tmp_path)
+    result = agent.run("write it")
+
+    assert result.stats.stop_reason == "empty_response"
+    assert "returned no content" in result.output
+    assert agent.messages[-1]["role"] == "assistant"
+    assert agent.messages[-1]["content"] == result.output

@@ -14,7 +14,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-273%20passed-brightgreen.svg)](#验证与实测)
+[![Tests](https://img.shields.io/badge/tests-282%20passed-brightgreen.svg)](#验证与实测)
 [![Coverage](https://img.shields.io/badge/coverage-82%25-brightgreen.svg)](#验证与实测)
 [![Version](https://img.shields.io/badge/version-1.3.0-informational.svg)](CHANGELOG.md)
 
@@ -85,6 +85,7 @@ CastorCoder 是一个运行在终端里的 AI 编程 Agent。它保留 Claude Co
 - **依赖感知并发**：相邻只读工具并发执行；写文件、Shell、任务状态和子 Agent 委派保持顺序，避免竞态。
 - **死循环防护**：相同批次重复、同一调用重复、交替重放、连续工具失败都会以明确原因停止。
 - **轮次上限的优雅处理**：达到 `max_rounds` 时，模型会基于已有证据做一次不带工具的最终回答，而不是直接丢弃上下文。
+- **空回复重试**：推理模型把输出预算花在思考上时，可能返回空正文；主循环会丢弃空消息、提示模型简短作答，并以双倍输出上限重试（最多两次），仍为空时给出可见的 `empty_response` 停止原因，而不是静默结束。
 - **上下文三层压缩**：裁剪冗长工具输出、摘要旧轮次、接近上限时硬压缩；`/compact` 可随时手动触发。
 - **轮间结果裁剪**：模型已经读过的旧工具结果会在后续轮次自动缩短，最新一轮保持不变。
 - **只读结果缓存**：相同只读调用在发生写操作前直接复用，减少重复 I/O。
@@ -133,7 +134,7 @@ CastorCoder 是一个运行在终端里的 AI 编程 Agent。它保留 Claude Co
 
 - **分层配置**：默认值 < 全局 TOML < 项目 TOML < 环境变量 < 命令行参数。
 - **完整 CLI**：doctor、单次任务、交互模式、会话恢复、Dashboard、门禁、Graph 子命令。
-- **自动化验证**：273 项测试、82% 分支覆盖率；CI 覆盖 3 个操作系统 × 4 个 Python 版本。
+- **自动化验证**：282 项测试、82% 分支覆盖率；CI 覆盖 3 个操作系统 × 4 个 Python 版本。
 - **本地评测**：脚本化轨迹、35 条查询的检索消融与 k 扫描、记忆召回、真实模型任务，以及固定校验和的 HumanEval / MBPP 适配器。
 
 ---
@@ -237,7 +238,7 @@ cd /path/to/your/repo
 castorcoder
 ```
 
-进入后会看到当前模型、工作区、会话、权限策略、思考强度、轮次上限与追踪路径。直接输入任务即可，例如：
+启动后先显示 CastorCoder 的 ASCII 图标，以及当前模型、工作区、会话、权限策略、思考强度、轮次上限与追踪路径。输入行带有独立边框：提交后边框会保留在回滚区，下一轮再出现新的输入框，因此不同轮次之间始终有清晰的视觉分隔。直接输入任务即可，例如：
 
 ```text
 阅读这个仓库的入口文件，说明请求从接收到返回经过哪些模块
@@ -975,7 +976,7 @@ flowchart LR
 
 | 检查项 | 结果 |
 |---|---|
-| 自动化测试 | **273 passed** |
+| 自动化测试 | **282 passed** |
 | 分支覆盖率 | **82%**（CI 门槛 80%） |
 | 静态检查 | `ruff check` 通过 |
 | 编译检查 | `compileall` 通过 |
@@ -1080,6 +1081,26 @@ provider rejected reasoning_effort=high; using its default
 ```
 
 这说明当前网关不支持该参数，模型会使用自身默认行为。
+
+### 模型只思考、不输出，对话像“卡住后直接结束”
+
+这是推理模型把输出预算全部花在思考上的典型情况：供应商返回 `finish_reason = length` 但没有正文，也没有工具调用。主循环现在会自动处理：
+
+1. 丢弃这条空回复，并追加一条要求模型简短作答的提示；
+2. 把本次调用的输出上限翻倍后重试（最多两次，最高 32768）；
+3. 如果供应商拒绝更大的上限，回退到原配置继续重试；
+4. 仍然为空时，以 `empty_response` 停止并打印处理建议，而不是静默回到输入行。
+
+如果频繁出现，可以降低思考强度或提高上限：
+
+```toml
+# ~/.castorcoder/config.toml
+max_tokens = 8192
+```
+
+```text
+/effort low
+```
 
 ### 中文或表格乱码
 

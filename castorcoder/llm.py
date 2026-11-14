@@ -238,6 +238,15 @@ class LLM:
         return self.total_reported_cost or None
 
     @property
+    def max_output_tokens(self) -> int:
+        """Configured per-call output cap, used when retrying a truncated reply."""
+
+        try:
+            return int(self.extra.get("max_tokens") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    @property
     def estimated_cost(self) -> float | None:
         """Rough cost estimate in USD. Returns None if model not in pricing table."""
         pricing = _pricing_for(self.model)
@@ -256,6 +265,7 @@ class LLM:
         on_token=None,
         on_reasoning=None,
         tool_choice: str | None = None,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         """Send messages, stream back response, handle tool calls."""
         params: dict = {
@@ -264,6 +274,8 @@ class LLM:
             "stream": True,
             **self.extra,
         }
+        if max_tokens is not None:
+            params["max_tokens"] = max(1, int(max_tokens))
         if tools:
             params["tools"] = tools
             if tool_choice is not None:
@@ -428,6 +440,7 @@ class LiteLLM(LLM):
         on_token=None,
         on_reasoning=None,
         tool_choice: str | None = None,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         """Send messages via litellm, stream back response, handle tool calls."""
         params: dict = {
@@ -436,6 +449,8 @@ class LiteLLM(LLM):
             "stream": True,
             **self.extra,
         }
+        if max_tokens is not None:
+            params["max_tokens"] = max(1, int(max_tokens))
         if tools:
             params["tools"] = tools
             if tool_choice is not None:

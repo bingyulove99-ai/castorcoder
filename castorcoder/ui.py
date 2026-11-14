@@ -36,6 +36,41 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich.text import Text
 
+# The startup mark: a beaver (castor) with terminal eyes and buck teeth.
+# Pure ASCII on purpose - a GBK console can print it without a UTF-8 switch.
+BRAND_ICON = (
+    r"      .-.        .-.",
+    r"     /   \______/   \ ",
+    r"    |   (o)    (o)   |",
+    r"    |        __       |",
+    r"     \      /  \     /",
+    r"      '----'    '---'",
+    r"           |_||_|",
+)
+
+# Cyan -> violet gradient, one colour per icon line.
+_BRAND_COLORS = (
+    "#22d3ee",
+    "#38bdf8",
+    "#60a5fa",
+    "#818cf8",
+    "#a78bfa",
+    "#c084fc",
+    "#e879f9",
+)
+
+
+def brand_mark() -> Text:
+    """Return the CastorCoder startup mark as a styled rich ``Text``."""
+
+    mark = Text()
+    for index, line in enumerate(BRAND_ICON):
+        if index:
+            mark.append("\n")
+        mark.append(line.rstrip(), style=f"bold {_BRAND_COLORS[index]}")
+    return mark
+
+
 # ASCII only: a legacy Windows console (GBK/cp936) cannot encode braille or
 # most emoji, and rich's legacy renderer raises instead of replacing them.
 _SPINNER = "-\\|/"
@@ -467,6 +502,22 @@ class _TerminalRenderer:
                 self._emit_tool_locked(name, args, success, duration, cached)
             self._set_status("Thinking", f"after {name}")
             self._resume()
+        elif kind == "llm.empty":
+            if data.get("retry"):
+                line = Text("  ~ ", style="yellow")
+                line.append(
+                    "empty reply"
+                    + (
+                        " (output limit)"
+                        if data.get("finish_reason") == "length"
+                        else ""
+                    )
+                    + ", retrying",
+                    style="dim",
+                )
+                with self._lock:
+                    self._note_locked(line)
+                self._resume()
         elif kind in {"context.trimmed", "context.compressed"}:
             if kind == "context.trimmed":
                 line = Text("  ", style="dim")

@@ -189,6 +189,13 @@ class TestChat:
         call_kwargs = self.fake.completion.call_args[1]
         assert call_kwargs["model"] == "anthropic/claude-3-haiku"
 
+    def test_per_call_max_tokens_override(self):
+        llm = LiteLLM(model="openai/gpt-4o", max_tokens=4_096)
+        llm.chat(messages=[{"role": "user", "content": "hi"}], max_tokens=8_192)
+        call_kwargs = self.fake.completion.call_args[1]
+        assert call_kwargs["max_tokens"] == 8_192
+        assert llm.max_output_tokens == 4_096
+
 
 # ---------------------------------------------------------------------------
 # Config integration

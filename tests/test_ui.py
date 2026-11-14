@@ -134,3 +134,28 @@ def test_blocks_are_separated_and_tool_receipts_are_one_line():
     first = stripped.index("First paragraph.")
     assert stripped[first + 1] == ""
     assert stripped[first + 2] == "Second paragraph."
+
+
+def test_brand_mark_is_ascii_and_multiline():
+    from castorcoder.ui import BRAND_ICON, brand_mark
+
+    assert len(BRAND_ICON) == 7
+    assert all(line.isascii() for line in BRAND_ICON)
+    mark = brand_mark()
+    plain = mark.plain
+    assert "|_||_|" in plain
+    assert "(o)" in plain
+    assert len(plain.splitlines()) == len(BRAND_ICON)
+
+
+def test_empty_reply_event_is_reported():
+    renderer, stream = _renderer()
+    renderer.begin()
+    renderer.on_event(AgentEvent("llm.empty", "r", data={
+        "finish_reason": "length", "retry": True,
+    }))
+    renderer.finish()
+
+    output = stream.getvalue()
+    assert "empty reply" in output
+    assert "output limit" in output

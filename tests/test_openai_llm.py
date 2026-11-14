@@ -91,3 +91,19 @@ def test_cost_estimate_known_and_unknown_model():
     assert llm.estimated_cost == 7.5
     llm.model = "custom-model"
     assert llm.estimated_cost is None
+
+
+def test_per_call_max_tokens_override_reaches_the_request():
+    calls = []
+
+    def call(params):
+        calls.append(dict(params))
+        return iter([_chunk(content="ok")])
+
+    llm = _llm(call)
+    llm.extra = {"temperature": 0, "max_tokens": 4_096}
+    response = llm.chat([{"role": "user", "content": "hi"}], max_tokens=8_192)
+
+    assert response.content == "ok"
+    assert calls[0]["max_tokens"] == 8_192
+    assert llm.max_output_tokens == 4_096

@@ -11,9 +11,12 @@ import threading
 import time
 from pathlib import Path
 
+from prompt_toolkit import PromptSession
 from prompt_toolkit import prompt as pt_prompt
+from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory, InMemoryHistory
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.styles import Style
 
 try:  # Windows-only failure mode, but the class imports everywhere.
     from prompt_toolkit.output.win32 import NoConsoleScreenBufferError
@@ -44,7 +47,7 @@ from .session import (
     new_session_id,
     save_session,
 )
-from .ui import LiveRenderer
+from .ui import LiveRenderer, brand_mark
 from .workspace import Workspace
 
 console = Console()
@@ -93,6 +96,100 @@ class SafeFileHistory(FileHistory):
             yield from super().load_history_strings()
         except OSError:
             return
+
+
+# Warm blue frame + cyan caret.  Keep the prompt ASCII: a GBK console cannot
+# encode the typographic arrows that look nicer on UTF-8 terminals.
+_INPUT_STYLE = Style.from_dict({
+    "frame.border": "#3b82f6",
+    "frame.label": "bold #22d3ee",
+    "prompt": "bold #22d3ee",
+    "prompt.continuation": "#3b82f6",
+})
+
+
+def _make_prompt_session(
+    history, bindings: KeyBindings, *, input=None, output=None
+) -> PromptSession:
+    """Build the framed input line used by the interactive REPL.
+
+    ``show_frame`` keeps a real border around the prompt and leaves it in the
+    scrollback after submission, so each turn is visually separated from the
+    answer that follows.  The label lives in the prompt itself because
+    ``PromptSession`` does not expose the frame title.
+    """
+
+    options = dict(
+        history=history,
+        key_bindings=bindings,
+        input=input,
+        output=output,
+        multiline=True,
+        style=_INPUT_STYLE,
+        prompt_continuation=(
+            lambda width, line_number, is_soft_wrap: FormattedText(
+                [("class:prompt.continuation", " " * max(0, width))]
+            )
+        ),
+    )
+    try:
+        return PromptSession(show_frame=True, **options)
+    except TypeError:
+        # prompt_toolkit versions before the framed prompt fall back to the
+        # plain input line instead of failing to start.
+        return PromptSession(**options)
+
+
+_INPUT_MESSAGE = FormattedText([("class:prompt", "You > ")])
+
+
+def _print_banner(agent: Agent, config: Config, trace_path: Path | None) -> None:
+    """Welcome screen: beaver mark, run context, and the essential hints."""
+
+    info = Table.grid(padding=(0, 2))
+    info.add_column(style="dim", justify="right", no_wrap=True)
+    info.add_column(overflow="fold")
+    info.add_row("model", f"[cyan]{config.model}[/cyan]")
+    info.add_row("workspace", f"[cyan]{agent.workspace.root}[/cyan]")
+    info.add_row("session", f"[cyan]{agent.session_id}[/cyan]")
+    info.add_row("policy", f"[yellow]{config.permission_mode}[/yellow]")
+    info.add_row(
+        "effort",
+        f"[cyan]{config.reasoning_effort}[/cyan] [dim]thinking, /effort to change[/dim]",
+    )
+    info.add_row("reasoning", f"[cyan]{config.reasoning_mode}[/cyan] [dim]display[/dim]")
+    info.add_row("rounds", f"[cyan]{config.max_rounds}[/cyan] [dim]per turn[/dim]")
+    if trace_path:
+        info.add_row("trace", f"[dim]{trace_path}[/dim]")
+
+    if console.width >= 68:
+        layout = Table.grid(padding=(0, 4))
+        layout.add_column(no_wrap=True)
+        layout.add_column(overflow="fold")
+        layout.add_row(brand_mark(), info)
+        body = layout
+    else:
+        body = info
+
+    subtitle = (
+        "[dim]/help commands  ·  /resume restore a chat  ·  quit exit[/dim]"
+        if console.width >= 78
+        else "[dim]/help  ·  /resume  ·  quit[/dim]"
+    )
+    console.print(
+        Panel(
+            body,
+            title="[bold #22d3ee]CastorCoder[/] [dim]v" + __version__ + "[/]",
+            subtitle=subtitle,
+            border_style="#3b82f6",
+            padding=(0, 1),
+        )
+    )
+    console.print(
+        "[dim]Sessions save automatically; [bold]castorcoder -c[/bold] resumes the "
+        "latest one and [bold]castorcoder -r[/bold] lets you pick. "
+        "[bold]/dashboard[/bold] opens the trace cockpit.[/dim]"
+    )
 
 
 
@@ -777,35 +874,7 @@ def _run_once(agent: Agent, prompt: str, config: Config | None = None):
 
 
 def _repl(agent: Agent, config: Config, trace_path: Path | None) -> None:
-    banner = Table.grid(padding=(0, 2))
-    banner.add_column(style="dim", justify="right", no_wrap=True)
-    banner.add_column(overflow="fold")
-    banner.add_row("model", f"[cyan]{config.model}[/cyan]")
-    banner.add_row("workspace", f"[cyan]{agent.workspace.root}[/cyan]")
-    banner.add_row("session", f"[cyan]{agent.session_id}[/cyan]")
-    banner.add_row("policy", f"[yellow]{config.permission_mode}[/yellow]")
-    banner.add_row(
-        "effort",
-        f"[cyan]{config.reasoning_effort}[/cyan] [dim]thinking, /effort to change[/dim]",
-    )
-    banner.add_row("reasoning", f"[cyan]{config.reasoning_mode}[/cyan] [dim]display[/dim]")
-    banner.add_row("rounds", f"[cyan]{config.max_rounds}[/cyan] [dim]per turn[/dim]")
-    if trace_path:
-        banner.add_row("trace", f"[dim]{trace_path}[/dim]")
-    console.print(
-        Panel(
-            banner,
-            title=f"[bold]CastorCoder[/bold] v{__version__}",
-            subtitle="[dim]/help commands  ·  /resume restore a chat  ·  quit exit[/dim]",
-            border_style="blue",
-            padding=(0, 1),
-        )
-    )
-    console.print(
-        "[dim]Sessions save automatically; [bold]castorcoder -c[/bold] resumes the "
-        "latest one and [bold]castorcoder -r[/bold] lets you pick. "
-        "[bold]/dashboard[/bold] opens the trace cockpit.[/dim]"
-    )
+    _print_banner(agent, config, trace_path)
 
     history: FileHistory | InMemoryHistory
     from .paths import home as castorcoder_home
@@ -829,18 +898,31 @@ def _repl(agent: Agent, config: Config, trace_path: Path | None) -> None:
 
     @bindings.add("enter")
     def _submit(event):
-        event.current_buffer.validate_and_handle()
+        # Ignore empty Enter: accepting it would leave an empty frame in the
+        # scrollback and make the conversation look like it skipped a turn.
+        if event.current_buffer.text.strip():
+            event.current_buffer.validate_and_handle()
 
     @bindings.add("escape", "enter")
     def _newline(event):
         event.current_buffer.insert_text("\n")
 
+    try:
+        session = _make_prompt_session(history, bindings)
+    except NoConsoleScreenBufferError:
+        # prompt_toolkit can raise while building the Win32 output object.  The
+        # prompt call below then reports the friendly fallback message.
+        session = None
+
     while True:
         try:
-            user_input = pt_prompt(
-                "You > ", history=history, multiline=True, key_bindings=bindings,
-                prompt_continuation="...  ",
-            ).strip()
+            if session is not None:
+                user_input = session.prompt(_INPUT_MESSAGE).strip()
+            else:
+                user_input = pt_prompt(
+                    "You > ", history=history, multiline=True,
+                    key_bindings=bindings, prompt_continuation="...  ",
+                ).strip()
         except NoConsoleScreenBufferError:
             console.print(
                 "[red]This terminal cannot host the interactive prompt. "

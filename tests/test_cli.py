@@ -149,3 +149,56 @@ def test_approval_is_denied_when_not_interactive(monkeypatch, capsys):
     approve = cli._make_approval()
     assert approve("write_file", {"file_path": "x"}, "policy") is False
     assert "non-interactive" in capsys.readouterr().out
+
+
+def test_interactive_banner_shows_brand_mark(tmp_path, monkeypatch):
+    import io
+
+    from rich.console import Console
+
+    from castorcoder.agent import Agent
+    from castorcoder.evals.runner import ScriptedLLM
+
+    stream = io.StringIO()
+    test_console = Console(file=stream, width=100, force_terminal=False, color_system=None)
+    monkeypatch.setattr(cli, "console", test_console)
+
+    agent = Agent(ScriptedLLM([]), workspace=tmp_path)
+    cli._print_banner(agent, Config(workspace=str(tmp_path)), None)
+
+    output = stream.getvalue()
+    assert "CastorCoder" in output
+    assert "|_||_|" in output and "(o)" in output
+    assert "model" in output and "workspace" in output
+    assert cli._INPUT_MESSAGE[0][1].startswith("You")
+
+
+def test_repl_prints_the_banner_and_uses_the_framed_prompt(tmp_path, monkeypatch):
+    import io
+
+    from rich.console import Console
+
+    from castorcoder.agent import Agent
+    from castorcoder.evals.runner import ScriptedLLM
+
+    stream = io.StringIO()
+    monkeypatch.setattr(
+        cli,
+        "console",
+        Console(file=stream, width=100, force_terminal=False, color_system=None),
+    )
+    seen = {}
+
+    class FakeSession:
+        def prompt(self, message):
+            seen["message"] = message
+            return "quit"
+
+    monkeypatch.setattr(cli, "_make_prompt_session", lambda *args, **kwargs: FakeSession())
+    agent = Agent(ScriptedLLM([]), workspace=tmp_path)
+    cli._repl(agent, Config(workspace=str(tmp_path)), None)
+
+    output = stream.getvalue()
+    assert "CastorCoder" in output and "|_||_|" in output
+    assert seen["message"] is cli._INPUT_MESSAGE
+    assert cli._INPUT_MESSAGE[0][1] == "You > "

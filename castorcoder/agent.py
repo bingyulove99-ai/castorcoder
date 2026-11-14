@@ -285,6 +285,9 @@ class Agent:
         consecutive_failed_rounds = 0
         read_only_rounds = 0
         nudged = False
+        empty_retries = 0
+        request_max_tokens: int | None = None
+        max_tokens_rejected = False
         mutation_epoch = 0
         read_cache: dict[str, tuple[int, str]] = {}
         output = ""
@@ -318,12 +321,31 @@ class Agent:
                     "context_tokens_estimate": estimate_tokens(self._full_messages()),
                 }))
                 llm_started = time.perf_counter()
-                response = self._chat(
-                    messages=self._full_messages(),
-                    tools=self._tool_schemas(),
-                    on_token=on_token,
-                    on_reasoning=on_reasoning,
-                )
+                chat_kwargs = {
+                    "messages": self._full_messages(),
+                    "tools": self._tool_schemas(),
+                    "on_token": on_token,
+                    "on_reasoning": on_reasoning,
+                }
+                if request_max_tokens is not None:
+                    chat_kwargs["max_tokens"] = request_max_tokens
+                try:
+                    response = self._chat(**chat_kwargs)
+                except Exception:
+                    if request_max_tokens is None:
+                        raise
+                    # Some providers cap output tokens below the retry budget.
+                    # Fall back to the configured limit rather than failing a
+                    # turn that would otherwise have produced an answer.
+                    max_tokens_rejected = True
+                    request_max_tokens = None
+                    response = self._chat(
+                        messages=self._full_messages(),
+                        tools=self._tool_schemas(),
+                        on_token=on_token,
+                        on_reasoning=on_reasoning,
+                    )
+                request_max_tokens = None
                 stats.prompt_tokens += response.prompt_tokens
                 stats.completion_tokens += response.completion_tokens
                 stats.reasoning_chars += len(getattr(response, "reasoning_content", "") or "")
@@ -337,8 +359,54 @@ class Agent:
                 }))
 
                 if not response.tool_calls:
-                    self.messages.append(response.message)
-                    output = response.content
+                    content = response.content or ""
+                    if content.strip():
+                        self.messages.append(response.message)
+                        output = content
+                        break
+                    # A reasoning model can spend the whole completion budget
+                    # thinking and return no text at all.  The old loop treated
+                    # that as a final answer, so the turn ended with a blank
+                    # screen and no explanation.  Drop the empty message and
+                    # retry once or twice with a nudge (and more output room).
+                    truncated = (response.finish_reason or "") == "length"
+                    retrying = empty_retries < 2
+                    self.event_bus.emit(AgentEvent("llm.empty", run_id, data={
+                        "round": round_index,
+                        "finish_reason": response.finish_reason,
+                        "completion_tokens": response.completion_tokens,
+                        "retry": retrying,
+                    }))
+                    if retrying:
+                        empty_retries += 1
+                        if truncated and not max_tokens_rejected:
+                            request_max_tokens = self._larger_output_budget()
+                        self.messages.append({
+                            "role": "user",
+                            "content": (
+                                "[harness note] Your previous reply was cut off by the "
+                                "output token limit before any answer text appeared; "
+                                "reasoning consumed the whole budget. Do not restart the "
+                                "analysis. Answer briefly now, or make one concrete tool "
+                                "call."
+                                if truncated
+                                else
+                                "[harness note] Your previous reply was empty. Continue "
+                                "the task: answer the user or call a tool."
+                            ),
+                        })
+                        continue
+                    stats.stop_reason = "empty_response"
+                    output = (
+                        "(stopped: the model returned no content after 2 retries"
+                        + (
+                            f"; it hit the {response.completion_tokens}-token output limit"
+                            if truncated
+                            else ""
+                        )
+                        + "; lower /effort or raise max_tokens in the config)"
+                    )
+                    self.messages.append({"role": "assistant", "content": output})
                     break
 
                 self.messages.append(response.message)
@@ -666,6 +734,21 @@ class Agent:
             "messages": len(self.messages),
             "tokens_estimate": estimate_tokens(self.messages),
         }))
+
+    def _larger_output_budget(self) -> int | None:
+        """Return a doubled output-token cap after a truncated empty reply.
+
+        Only adapters that expose the configured cap participate; scripted
+        models and custom adapters keep their own behaviour.
+        """
+
+        try:
+            current = int(getattr(self.llm, "max_output_tokens", 0) or 0)
+        except (TypeError, ValueError):
+            return None
+        if current <= 0:
+            return None
+        return min(current * 2, 32_768)
 
     def _over_budget(self) -> bool:
         if self.max_cost_usd is None:

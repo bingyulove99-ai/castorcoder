@@ -83,6 +83,28 @@ def _get_sessions_dir() -> Path:
             return tmp
 
 
+def _without_empty_assistant_tail(messages: list[dict]) -> list[dict]:
+    """Drop trailing empty assistant messages from a saved conversation.
+
+    Older builds treated a reasoning-only truncation as a final answer and
+    persisted an assistant message with ``content: None``.  Such a message is
+    useless when resumed and can confuse strict OpenAI-compatible servers.
+    """
+
+    cleaned = list(messages)
+    while cleaned:
+        last = cleaned[-1]
+        if (
+            last.get("role") == "assistant"
+            and not last.get("tool_calls")
+            and not str(last.get("content") or "").strip()
+        ):
+            cleaned.pop()
+        else:
+            break
+    return cleaned
+
+
 def save_session(
     messages: list[dict],
     model: str,
@@ -99,7 +121,7 @@ def save_session(
         "model": model,
         "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "saved_at_ts": time.time(),
-        "messages": messages,
+        "messages": _without_empty_assistant_tail(messages),
         "metadata": metadata or {},
     }
     path = _session_path(session_id, root=sessions_dir)
@@ -128,7 +150,9 @@ def load_session_data(session_id: str) -> dict[str, Any] | None:
 
 def load_session(session_id: str) -> tuple[list[dict], str] | None:
     data = load_session_data(session_id)
-    return (data["messages"], data["model"]) if data else None
+    if not data:
+        return None
+    return (_without_empty_assistant_tail(data["messages"]), data["model"])
 
 
 def list_sessions(limit: int = 20, workspace: str | Path | None = None) -> list[dict]:

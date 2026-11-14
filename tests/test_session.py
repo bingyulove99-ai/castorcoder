@@ -123,3 +123,21 @@ def test_metadata_round_trips_for_resume(tmp_path, monkeypatch):
     data = load_session_data(session_id)
     assert data["metadata"]["tasks"] == tasks
 
+
+
+def test_empty_assistant_tail_is_not_persisted_or_resumed(tmp_path, monkeypatch):
+    _isolate_sessions(monkeypatch, tmp_path)
+    messages = [
+        {"role": "user", "content": "write it"},
+        {"role": "assistant", "content": "working"},
+        {"role": "assistant", "content": None},
+    ]
+    session_id = save_session(messages, "model")
+    loaded_messages, _ = load_session(session_id)
+
+    assert loaded_messages == [
+        {"role": "user", "content": "write it"},
+        {"role": "assistant", "content": "working"},
+    ]
+    # The caller's live history is left untouched.
+    assert messages[-1]["content"] is None
